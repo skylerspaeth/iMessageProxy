@@ -1,24 +1,20 @@
-import sqlite3
-import time
+#!/usr/bin/env python3
+
+import sqlite3, time, plistlib, datetime, argparse
 from striprtf.striprtf import rtf_to_text
-import plistlib
-import datetime
-import argparse
 from pathlib import Path
 
 parser = argparse.ArgumentParser(
-    prog='iMessage Receive Script',
-    description='Listens for messages from a argument-specified contact via the iMessages DB'
-    # epilog=''
+    prog='./receive.py',
+    description='Listens for iMessages from an argument-specified contact'
 )
 parser.add_argument('-c', '--contact')
 args = parser.parse_args()
 
 DB_PATH = f"{Path.home()}/Library/Messages/chat.db"
 
-# Gets the time in nanoseconds since the Cocoa epoch (Jan. 1, 2001, 00:00)
 def get_current_cocoa_timestamp():
-    cocoa_epoch = datetime.datetime(2001, 1, 1, 0, 0, 0, 0)
+    cocoa_epoch = datetime.datetime(2001, 1, 1, 0, 0, 0, 0) # Jan 1, 2001 @ 00:00
     now = datetime.datetime.utcnow()
 
     # Calculate the difference in seconds and convert to nanoseconds
@@ -49,7 +45,7 @@ def extract_plain_text(attributed_body):
 def fetch_messages(initialTime):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     query = """
     SELECT message.date, message.text, message.attributedBody, handle.id
     FROM message
@@ -80,10 +76,10 @@ def monitor_messages():
                     else:
                         print("Message received but no attributedBody property, ignoring...")
                 else:
-                    print("Message with identical timestamp received, ignoring...")
+                    # print("Message with identical timestamp received, ignoring...")
 
                 seen.add(message)
-        time.sleep(0.01)
+        time.sleep(0.01) # Poll every 10ms
 
 if __name__ == "__main__":
     monitor_messages()
