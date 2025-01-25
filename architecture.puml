@@ -1,0 +1,71 @@
+@startuml
+skinparam BoxPadding 20
+
+actor "End User" as EU
+box Local Services #WhiteSmoke
+    participant "Browser" as BRO
+    participant "Local\nHTTP\nProxy\nThread 1" as LP
+    database "Local\nHTTP\nProxy\nGlobal\nScope" as GS
+    participant "Local\nHTTP\nProxy\nThread 2" as LPT
+    participant "iMessage\nSend\nLibrary" as IMS
+    participant "iMessage\nDatabase\nMonitor" as IMR
+    database "Local\niMessages\nDatabase" as IMD
+end box
+box Remote Services #WhiteSmoke
+    participant "iMessage\nSystem\nService" as ISS
+    participant "Remote\niMessage\nReceiver" as RMR
+    participant "Remote\niMessage\nDatabase\nMonitor" as RIMR
+    database "Remote\niMessages\nDatabase" as RIMD
+end box
+
+group Monitor for incoming iMessages remotely
+    loop every X milliseconds
+        RIMR -> RIMD ++ : SELECT LIMIT 1
+        activate RIMR
+        return record
+        RIMR -> RIMR : uuid, realPayload = lineSplit(record.payload)
+        RIMR -> RIMR : response = fulfillHTTPRequest(payload)\nresponse = uuid + '\\n' + response
+        RIMR -> ISS ++ : iMessage(record.sender, response)
+        return ACK
+        deactivate RIMR
+    end
+end
+
+EU -> BRO ++ : Click Link to\nhttp://foo.com
+activate EU
+
+'BRO -> DNS ++ : Get IP for foo.com
+'return return 123.4.5.6
+
+BRO -> LP ++ : GET http://foo.com
+LP -> LP : uuid = getUUID()\npayload = uuid + '\\n' + receivedPayload
+LP -> IMS ++ : iMessage(remoteRecipient, payload)
+IMS -> ISS ++ : send iMessage to remoteRecipient {payload}
+ISS -> RIMD ++ : INSERT message
+return ACK
+return ACK
+return ACK
+LP -> LP : condition.wait()
+
+group Monitor for incoming iMessages locally
+    loop every X milliseconds
+        IMR -> IMD ++ : SELECT LIMIT 1
+        activate IMR
+        return record
+        IMR -> LPT ++ : POST /messageReceived {record.payload}
+        LPT -> LPT : uuid, payload = payload
+        LPT -> GS ++ : set(uuid, payload)
+        return ACK
+        LPT -> LP : condition.notify()
+        return HTTP 200
+        deactivate IMR
+    end
+end
+
+LP -> GS ++ : responseHTML = get(uuid)
+return responseHTML
+return responseHTML
+return Render Page
+deactivate EU
+
+@enduml
